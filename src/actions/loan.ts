@@ -458,6 +458,7 @@ export async function executeDisbursement(loanId: string) {
       }),
     ]);
 
+
     revalidatePath('/');
     return {
       success: true,
@@ -468,38 +469,6 @@ export async function executeDisbursement(loanId: string) {
   } catch (error: any) {
     console.error('Error executeDisbursement:', error);
     return { success: false, error: error.message };
-  }
-}
-
-/**
- * Sinkronisasi data real dari dev MySQL (10.101.32.134) via SSH tunnel
- */
-export async function syncDevLoansAction(): Promise<{
-  success: boolean;
-  total?: number;
-  created?: number;
-  updated?: number;
-  message: string;
-}> {
-  try {
-    const { syncDevLoans } = await import('@/scripts/sync-dev-data');
-    const result = await syncDevLoans({ fresh: false });
-    try {
-      revalidatePath('/');
-    } catch (_) {}
-    return {
-      success: true,
-      total: result.total,
-      created: result.created,
-      updated: result.updated,
-      message: `Sinkronisasi berhasil! Total ${result.total} pengajuan (Baru: ${result.created}, Terupdate: ${result.updated}).`,
-    };
-  } catch (error: any) {
-    console.error('Error syncDevLoansAction:', error);
-    return {
-      success: false,
-      message: `Gagal sinkronisasi dari server dev: ${error?.message || error}`,
-    };
   }
 }
 
