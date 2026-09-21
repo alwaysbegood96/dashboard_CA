@@ -7,7 +7,6 @@ import LoanTable from '@/components/LoanTable';
 import ApprovalDrawer from '@/components/ApprovalDrawer';
 import { LoanApplicationItem, UserRoleView } from '@/types/loan';
 import { getLoans } from '@/actions/loan';
-import { getCurrentSession } from '@/actions/rbac';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/LanguageContext';
@@ -21,35 +20,26 @@ export default function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [selectedLoan, setSelectedLoan] = useState<LoanApplicationItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [sessionUser, setSessionUser] = useState<any>(null);
 
-  // Fetch loans from DB & current user session
+  // Fetch loans from DB
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, session] = await Promise.all([getLoans(), getCurrentSession()]);
+      const data = await getLoans();
       setLoans(data);
-      setSessionUser(session);
-
-      if (session) {
-        if (session.role === 'SUPER_ADMIN' || session.role === 'ADMIN') {
-          setCurrentRole('CREDIT_SUPERVISOR');
-        } else {
-          setCurrentRole('CREDIT_ANALYST');
-        }
-      }
 
       // Update selected loan if drawer is open
-      if (selectedLoan) {
-        const updated = data.find((l) => l.id === selectedLoan.id);
-        if (updated) setSelectedLoan(updated);
-      }
+      setSelectedLoan((prev) => {
+        if (!prev) return null;
+        const updated = data.find((l) => l.id === prev.id);
+        return updated || prev;
+      });
     } catch (err) {
       console.error('Failed to load loans:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedLoan]);
+  }, []);
 
   // On mount: load loans from database
   useEffect(() => {
@@ -68,7 +58,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Top Navbar */}
-      <Header currentRole={currentRole} onRoleChange={setCurrentRole} sessionUser={sessionUser} />
+      <Header currentRole={currentRole} onRoleChange={setCurrentRole} />
 
       {/* Main Content Canvas */}
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-7">
