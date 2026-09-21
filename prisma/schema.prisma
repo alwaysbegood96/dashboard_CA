@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LoanStatus {
+  PAYMENT_FAILED
+  UNDER_REVIEW_CA
+  WAITING_SPV_APPROVAL
+  OFFERING_CUSTOMER
+  READY_FOR_DISBURSEMENT
+  DISBURSED
+  REJECTED_CA
+  REJECTED_SPV
+}
+
+enum ReviewLayer {
+  LAYER_1_CA
+  LAYER_2_SPV
+  CUSTOMER_OFFERING
+  DISBURSEMENT
+}
+
+model LoanApplication {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNo          String          @unique @map("order_no") @db.VarChar(32)
+  applicantName    String          @map("applicant_name") @db.VarChar(100)
+  idNo             String          @map("id_no") @db.VarChar(30)
+  phone            String          @db.VarChar(20)
+  accountNo        String          @map("account_no") @db.VarChar(50)
+  bankName         String          @default("Bank Sentosa") @map("bank_name") @db.VarChar(50)
+  loanType         String          @default("KREDIT_MULTIGUNA") @map("loan_type") @db.VarChar(50)
+  requestedAmount  Decimal         @map("requested_amount") @db.Decimal(15, 2)
+  approvedAmount   Decimal?        @map("approved_amount") @db.Decimal(15, 2)
+  tenorMonth       Int             @default(1) @map("tenor_month")
+  approvedTenor    Int?            @map("approved_tenor")
+  interestRate     Decimal         @default(3.00) @map("interest_rate") @db.Decimal(5, 2)
+  monthlyIncome    Decimal         @map("monthly_income") @db.Decimal(15, 2)
+  dsrRatio         Decimal         @map("dsr_ratio") @db.Decimal(5, 2)
+  creditScore      Int             @map("credit_score")
+  slikStatus       String          @default("LANCAR") @map("slik_status") @db.VarChar(20)
+  status           LoanStatus      @default(UNDER_REVIEW_CA)
+  currentLayer     ReviewLayer     @default(LAYER_1_CA) @map("current_layer")
+  // CA Review notes
+  caNotes          String?         @map("ca_notes") @db.Text
+  spvNotes         String?         @map("spv_notes") @db.Text
+  rejectionReason  String?         @map("rejection_reason") @db.Text
+
+  // Extended debtor profile
+  companyName      String?         @map("company_name") @db.VarChar(150)
+  jobType          String?         @map("job_type") @db.VarChar(50)
+  streetAddress    String?         @map("street_address") @db.Text
+  city             String?         @db.VarChar(50)
+  province         String?         @db.VarChar(50)
+
+  // Emergency contact
+  emergencyName    String?         @map("emergency_name") @db.VarChar(100)
+  emergencyRelation String?        @map("emergency_relation") @db.VarChar(50)
+  emergencyPhone   String?         @map("emergency_phone") @db.VarChar(20)
+
+  // Device & biometric verification
+  deviceModel      String?         @map("device_model") @db.VarChar(50)
+  faceScore        String?         @map("face_score") @db.VarChar(10)
+
+  // CA telephone verification notes
+  teleVerify       String?         @map("tele_verify") @db.Text
+  callRelat        String?         @map("call_relat") @db.Text
+
+  // IBSCore Core Banking fields
+  cif              String?         @map("cif") @db.VarChar(50)
+  motherName       String?         @map("mother_name") @db.VarChar(100)
+  birthPlace       String?         @map("birth_place") @db.VarChar(100)
+  birthDate        String?         @map("birth_date") @db.VarChar(20)
+  loanAccountNo    String?         @map("loan_account_no") @db.VarChar(50)
+  spkNo            String?         @map("spk_no") @db.VarChar(50)
+  branchCode       String?         @default("212") @map("branch_code") @db.VarChar(10)
+  productCode      String?         @default("102") @map("product_code") @db.VarChar(10)
+  creditType       String?         @default("700") @map("credit_type") @db.VarChar(10)
+  disbursementReceiptNo String?    @map("disbursement_receipt_no") @db.VarChar(100)
+  disbursementTxType    String?    @default("C2") @map("disbursement_tx_type") @db.VarChar(10)
+
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  reviewLogs       LoanReviewLog[]
+
+  @@map("loan_applications")
+}
+
+model LoanReviewLog {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loanId       String          @map("loan_id") @db.Uuid
+  operatorName String          @map("operator_name") @db.VarChar(100)
+  operatorRole String          @map("operator_role") @db.VarChar(50)
+  action       String          @db.VarChar(50)
+  amountBefore Decimal?        @map("amount_before") @db.Decimal(15, 2)
+  amountAfter  Decimal?        @map("amount_after") @db.Decimal(15, 2)
+  notes        String?         @db.Text
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+
+  loan         LoanApplication @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("loan_review_logs")
+}
+
+// ─────────────────────────────────────────────
+// RBAC & Auth Models
+// ─────────────────────────────────────────────
+
+model AdminRole {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String            @unique @db.VarChar(50)
+  displayName String            @map("display_name") @db.VarChar(100)
+  description String?           @db.Text
+  permissions String[]          @default([])
+  isSystem    Boolean           @default(false) @map("is_system")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  users       AdminUser[]
+  invitations AdminInvitation[]
+
+  @@map("admin_roles")
+}
+
+model AdminUser {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String            @db.VarChar(100)
+  email         String            @unique @db.VarChar(150)
+  passwordHash  String?           @map("password_hash") @db.VarChar(255)
+  roleId        String?           @map("role_id") @db.Uuid
+  isActive      Boolean           @default(true) @map("is_active")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  role          AdminRole?        @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  invitations   AdminInvitation[] @relation("InvitedByUser")
+
+  @@map("admin_users")
+}
+
+model AdminInvitation {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email       String     @db.VarChar(150)
+  roleId      String     @map("role_id") @db.Uuid
+  token       String     @unique @db.VarChar(255)
+  invitedBy   String?    @map("invited_by") @db.Uuid
+  expiresAt   DateTime   @map("expires_at") @db.Timestamp(6)
+  acceptedAt  DateTime?  @map("accepted_at") @db.Timestamp(6)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamp(6)
+
+  role        AdminRole  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  inviter     AdminUser? @relation("InvitedByUser", fields: [invitedBy], references: [id], onDelete: SetNull)
+
+  @@map("admin_invitations")
+}
+
+model PasswordReset {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String    @db.VarChar(150)
+  token     String    @unique @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamp(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamp(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("password_resets")
+}
+
